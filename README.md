@@ -1,0 +1,221 @@
+# Customer Support AI System
+
+A GitHub-ready reference implementation for **Task 2 – Support Knowledge Base Ingestion & RAG Pipeline**.
+
+## Features
+
+- Upload FAQ, support, policy PDF, TXT, and Markdown documents
+- Extract text page-by-page with PyMuPDF
+- Clean extracted text
+- Split content into overlapping, boundary-aware chunks
+- Generate normalized embeddings with Sentence Transformers
+- Persist vectors in ChromaDB
+- Semantic similarity search
+- Document-level and page-level source metadata
+- FastAPI backend
+- Streamlit demonstration UI
+- Pytest test suite
+- Docker/Docker Compose support
+
+## Architecture
+
+```text
+Documents
+   │
+   ▼
+Upload API ──► PDF/Text Extraction
+                  │
+                  ▼
+             Text Cleaning
+                  │
+                  ▼
+             Chunking + Overlap
+                  │
+                  ▼
+            Sentence Embeddings
+                  │
+                  ▼
+               ChromaDB
+                  │
+             User Query
+                  ▼
+          Query Embedding
+                  │
+                  ▼
+          Semantic Similarity
+                  │
+                  ▼
+       Top-K Chunks + Metadata
+```
+
+## Quick start
+
+### 1. Create a virtual environment
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+# Windows:
+# .venv\Scripts\activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+The first embedding operation downloads the configured Sentence Transformer model.
+
+### 3. Start the API
+
+```bash
+uvicorn app.main:app --reload
+```
+
+API: `http://localhost:8000`
+
+Swagger docs: `http://localhost:8000/docs`
+
+### 4. Start the demo
+
+In another terminal:
+
+```bash
+streamlit run demo/streamlit_app.py
+```
+
+Open the Streamlit URL shown by the terminal.
+
+## API examples
+
+### Health
+
+```bash
+curl http://localhost:8000/health
+```
+
+### Ingest a PDF
+
+```bash
+curl -X POST http://localhost:8000/ingest \
+  -F "file=@data/sample_documents/refund_policy.pdf"
+```
+
+Example response:
+
+```json
+{
+  "document_id": "generated-id",
+  "document_name": "refund_policy.pdf",
+  "pages": 3,
+  "chunks": 4,
+  "message": "Document ingested successfully."
+}
+```
+
+### Semantic search
+
+```bash
+curl -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How long do customers have to request a refund?","top_k":5}'
+```
+
+Search results contain:
+
+- chunk text
+- similarity score
+- document ID
+- document filename
+- page number
+- chunk ID
+- source filename
+
+## Metadata design
+
+Every stored chunk has metadata similar to:
+
+```json
+{
+  "document_id": "abc123",
+  "document_name": "refund_policy.pdf",
+  "document_type": "pdf",
+  "page_number": 3,
+  "chunk_number": 2,
+  "source": "refund_policy.pdf",
+  "uploaded_at": "2026-09-05T00:00:00+00:00"
+}
+```
+
+This provides source tracking from a semantic-search result back to its document and page.
+
+## Running tests
+
+```bash
+pytest -q
+```
+
+The tests cover:
+
+- text cleaning
+- chunking and page metadata
+- TXT loading
+- API health
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+API: `http://localhost:8000`
+
+Demo: `http://localhost:8501`
+
+## Sample demo questions
+
+Try:
+
+- "How long do customers have to request a refund?"
+- "What should I do if my account is locked?"
+- "How quickly are password reset emails sent?"
+- "Which payment methods are supported?"
+- "Can a refund be requested after 30 days?"
+
+## Extending this into full RAG
+
+The current implementation intentionally separates retrieval from answer generation:
+
+```text
+Query
+  ↓
+Semantic Search
+  ↓
+Top-K Context
+  ↓
+LLM Prompt
+  ↓
+Grounded Support Answer + Citations
+```
+
+An LLM can be added after `/search` to generate a final answer from the returned chunks. The existing metadata can be used to display citations such as `refund_policy.pdf, page 3`.
+
+## Production considerations
+
+For a production deployment, add:
+
+- authentication and authorization
+- file-size/type validation and malware scanning
+- OCR for scanned PDFs
+- duplicate-document detection
+- document deletion/re-indexing
+- background ingestion jobs
+- embedding model/version metadata
+- tenant/customer isolation
+- hybrid keyword + vector search
+- reranking
+- evaluation datasets and retrieval metrics
+- observability and audit logs
+- secrets management
+#
